@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  camguard-collector:
+    image: registry.malltech.ru/camguard-collector:latest
+    ports:
+      - 80
+    environment:
+      - image_api_url=https://api.malltech.ru/camera/api/v
+      - sensor_timeout=300
+      - task_queue_size=20
+      - camera_guard_base=https://camguard.malltech.ru
+      - ping_timeout=20
+      - retries_number=1
+      - retries_period=60
+      - GUNICORN_CONF=/app/custom_gunicorn_conf.py
+      - LOG_LEVEL=info
+      - http_client_retries_number=5
+      - DEBUG=0
+      - token_timeout=1800
+      - S3_ENDPOINT=https://storage.malltech.ru
+      - s3_bucket=malltech
+      - youtube_delay=2
+      - proxy=''
+      - wectech_delay=10
+    deploy:
+      replicas: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - "node.labels.integration==true"
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.services.collector.loadbalancer.server.port=80"
+        - "traefik.http.services.collector.loadbalancer.healthcheck.path=/ping"
+        - "traefik.http.services.collector.loadbalancer.healthcheck.interval=60s"
+        - "traefik.http.services.collector.loadbalancer.healthcheck.timeout=30s"
+        - "traefik.http.middlewares.collector-stripprefix.stripprefix.prefixes=/collector"
+        - "traefik.http.routers.collector.rule=(Host(`camguard.malltech.ru`) && PathPrefix(`/collector`))"
+        - "traefik.http.routers.collector.middlewares=collector-stripprefix"
+        - "traefik.http.routers.collector.entrypoints=websecure"
+        - "traefik.http.routers.collector.tls=true"
+        - "traefik.docker.network=proxy"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://graylog.rednvd.ru:12210"
+        tag: "camguard_collector"
+    secrets:
+      - camguard_login
+      - camguard_password
+      - sensors_aws_secret_access_key
+      - sensors_aws_access_key_id
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+
+secrets:
+  camguard_password:
+    external: true
+  camguard_login:
+    external: true
+  sensors_aws_secret_access_key:
+    external: true
+  sensors_aws_access_key_id:
+    external: true

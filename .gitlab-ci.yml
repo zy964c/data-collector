@@ -1,0 +1,33 @@
+stages:
+  - build-microservices
+  - test
+  - deploy
+
+build_camguard_collector:
+  stage: build-microservices
+  script:
+    - docker build -t registry.malltech.ru/camguard-collector:latest -t registry.malltech.ru/camguard-collector:$CI_COMMIT_TAG -f ./app/Dockerfile .
+    - docker push registry.malltech.ru/camguard-collector
+  only:
+    - tags
+  except:
+    - branches
+  tags:
+    - swarm
+
+unittests:
+  stage: test
+  script:
+    - docker build -t collector-tests -f ./app/tests.Dockerfile .
+    - docker run collector-tests
+  tags:
+    - swarm
+
+deploy:
+  stage: deploy
+  script:
+    - docker stack deploy -c ./docker-stack.yml camguard-collector
+  only:
+    - tags
+  except:
+    - branches

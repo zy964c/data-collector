@@ -1,0 +1,11 @@
+version: '3'
+services:
+  data-collector:
+    build: ./app
+    ports:
+      - "8003:80"
+    restart: always
+    env_file:
+      - ${APPENV}.env
+    volumes:
+      - ./logs:/app/logs
